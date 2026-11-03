@@ -1,0 +1,50 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+.cache/
+.temp/
+tmp/
+*.log
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+credentials*.json
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+
+# Editors and OS files
+.idea/
+.vscode/
+*.suo
+*.user
+*.swp
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Native build artifacts (native sources should be committed when generated)
+.gradle/
+build/
+DerivedData/
+Pods/
+local.properties
+*.xcuserstate
+xcuserdata/
+*.apk
+*.aab
+*.ipa

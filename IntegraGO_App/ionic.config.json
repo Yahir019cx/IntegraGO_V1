@@ -1,0 +1,7 @@
+{
+  "name": "IntegraGo",
+  "type": "vue-vite",
+  "integrations": {
+    "capacitor": {}
+  }
+}

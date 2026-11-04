@@ -22,13 +22,20 @@ workflows:
         script: xcode-project use-profiles
       - name: Generar IPA
         script: |
+          set -e
+          ipa_dir="$PWD/build/ios/ipa"
           xcode-project build-ipa \
             --project ios/App/App.xcodeproj \
             --scheme App \
             --archive-xcargs "CURRENT_PROJECT_VERSION=${BUILD_NUMBER:?}" \
-            --ipa-directory "$CM_BUILD_DIR/build/ios/ipa"
+            --ipa-directory "$ipa_dir"
+          if ! compgen -G "$ipa_dir/*.ipa" > /dev/null; then
+            echo "No se encontro el IPA exportado en $ipa_dir" >&2
+            exit 1
+          fi
+          ls -lh "$ipa_dir"/*.ipa
     artifacts:
-      - build/ios/ipa/*.ipa
+      - IntegraGO_App/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:

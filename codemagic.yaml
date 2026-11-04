@@ -23,7 +23,7 @@ workflows:
       - name: Generar IPA
         script: |
           set -e
-          ipa_dir="$PWD/build/ios/ipa"
+          ipa_dir="$CM_BUILD_DIR/testflight-ipa"
           xcode-project build-ipa \
             --project ios/App/App.xcodeproj \
             --scheme App \
@@ -35,7 +35,7 @@ workflows:
           fi
           ls -lh "$ipa_dir"/*.ipa
     artifacts:
-      - IntegraGO_App/build/ios/ipa/*.ipa
+      - $CM_BUILD_DIR/testflight-ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:

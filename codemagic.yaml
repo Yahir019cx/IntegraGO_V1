@@ -1,14 +1,38 @@
 workflows:
-  integrago-ionic:
-    name: IntegraGo Ionic
-    instance_type: linux_x2
+  integrago-ios-testflight:
+    name: IntegraGo iOS TestFlight
+    instance_type: mac_mini_m2
     working_directory: IntegraGO_App
+    integrations:
+      app_store_connect: IntegraGo
     environment:
-      node: 24
+      node: "24"
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: mx.grupocge.integrago
     scripts:
       - name: Instalar dependencias
         script: npm ci
-      - name: Compilar la app web
+      - name: Preparar recursos para Capacitor
         script: npm run build
+      - name: Sincronizar el proyecto iOS
+        script: npm run cap -- sync ios
+      - name: Aplicar firma de distribucion
+        script: xcode-project use-profiles
+      - name: Asignar numero de compilacion
+        script: |
+          cd ios/App
+          agvtool new-version -all "$BUILD_NUMBER"
+      - name: Generar IPA
+        script: |
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App \
+            --ipa-directory "$CM_BUILD_DIR/build/ios/ipa"
     artifacts:
-      - IntegraGO_App/dist/**/*
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration

@@ -20,15 +20,12 @@ workflows:
         script: npm run cap -- sync ios
       - name: Aplicar firma de distribucion
         script: xcode-project use-profiles
-      - name: Asignar numero de compilacion
-        script: |
-          cd ios/App
-          agvtool new-version -all "$BUILD_NUMBER"
       - name: Generar IPA
         script: |
           xcode-project build-ipa \
             --project ios/App/App.xcodeproj \
             --scheme App \
+            --archive-xcargs "CURRENT_PROJECT_VERSION=${BUILD_NUMBER:?}" \
             --ipa-directory "$CM_BUILD_DIR/build/ios/ipa"
     artifacts:
       - build/ios/ipa/*.ipa

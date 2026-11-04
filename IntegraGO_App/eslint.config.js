@@ -1,18 +1,20 @@
-import js from '@eslint/js';
-import vue from 'eslint-plugin-vue';
-import tseslint from 'typescript-eslint';
+import js from "@eslint/js";
+import vue from "eslint-plugin-vue";
+import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'android/**', 'ios/**', 'node_modules/**'] },
+  { ignores: ["dist/**", "android/**", "ios/**", "node_modules/**"] },
   js.configs.recommended,
   tseslint.configs.recommended,
-  vue.configs['flat/essential'],
+  vue.configs["flat/essential"],
   {
-    files: ['**/*.vue'],
+    files: ["**/*.vue"],
+    // TypeScript comprueba los identificadores y tipos en los SFC.
+    rules: { "no-undef": "off" },
     languageOptions: {
       parserOptions: {
         parser: tseslint.parser,
-        extraFileExtensions: ['.vue'],
+        extraFileExtensions: [".vue"],
       },
     },
   },

@@ -4,7 +4,7 @@ workflows:
     instance_type: mac_mini_m2
     working_directory: IntegraGO_App
     integrations:
-      app_store_connect: IntegraGo
+      app_store_connect: CodeMagic
     environment:
       node: "24"
       xcode: latest

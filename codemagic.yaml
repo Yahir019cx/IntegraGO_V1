@@ -8,6 +8,8 @@ workflows:
     environment:
       node: "24"
       xcode: latest
+      vars:
+        APP_VERSION: "1.0.1"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: mx.grupocge.integrago
@@ -27,7 +29,7 @@ workflows:
           xcode-project build-ipa \
             --project ios/App/App.xcodeproj \
             --scheme App \
-            --archive-xcargs "CURRENT_PROJECT_VERSION=${BUILD_NUMBER:?}" \
+            --archive-xcargs "MARKETING_VERSION=${APP_VERSION:?} CURRENT_PROJECT_VERSION=${BUILD_NUMBER:?}" \
             --ipa-directory "$ipa_dir"
           if ! compgen -G "$ipa_dir/*.ipa" > /dev/null; then
             echo "No se encontro el IPA exportado en $ipa_dir" >&2

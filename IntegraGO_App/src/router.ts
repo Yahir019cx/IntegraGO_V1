@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "@ionic/vue-router";
-import { session, restoreSession } from "@/services/session";
+import { needsWorkLocation, session, restoreSession } from "@/services/session";
 import type { RouteLocationNormalized } from "vue-router";
 
 restoreSession();
@@ -17,6 +17,11 @@ const router = createRouter({
       name: "login",
       component: () => import("@/views/LoginPage.vue"),
       meta: { public: true },
+    },
+    {
+      path: "/location",
+      name: "location",
+      component: () => import("@/views/WorkLocationPage.vue"),
     },
     {
       path: "/home",
@@ -63,6 +68,8 @@ const router = createRouter({
 
 router.beforeEach((to: RouteLocationNormalized) => {
   if (!to.meta.public && !session.value) return { name: "login" };
+  if (needsWorkLocation.value && to.name !== "location") return { name: "location" };
+  if (to.name === "location" && !needsWorkLocation.value) return { name: "home" };
   if (to.name === "login" && session.value) return { name: "home" };
   if (to.name === "capture" && session.value?.role === "counter")
     return { name: "scan" };

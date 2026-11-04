@@ -8,13 +8,17 @@ import BrandLogo from "@/components/BrandLogo.vue";
 import OfferSummary from "@/components/OfferSummary.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import ListSkeleton from "@/components/ListSkeleton.vue";
+import ClientOfferPass from "@/components/ClientOfferPass.vue";
 import { useOfferList } from "@/composables/useOfferList";
+import { reuseOfferDraft } from "@/composables/useDraft";
+import { matchesSellerReference } from "@/services/offers";
+import { session } from "@/services/session";
 import { dateTime } from "@/utils/format";
 const route = useRoute();
 const router = useRouter();
 const { items, loading, error, refresh } = useOfferList();
 const offer = computed(() =>
-  items.value.find((item) => item.sellerReference === route.params.reference),
+  items.value.find((item) => matchesSellerReference(item, route.params.reference)),
 );
 const resendOpen = ref(false);
 const resendTrigger = ref<HTMLButtonElement>();
@@ -22,6 +26,11 @@ const resendDialogId = useId();
 function closeResend() {
   resendOpen.value = false;
   resendTrigger.value?.focus();
+}
+function reuseOffer() {
+  if (!offer.value || offer.value.status === "active" || session.value?.role !== "seller") return;
+  reuseOfferDraft(offer.value);
+  void router.push("/capture");
 }
 </script>
 <template>
@@ -47,7 +56,7 @@ function closeResend() {
           <span>{{ offer.airport.code }}</span>
         </div>
         <div class="ticket-caption-line">
-          <span>Folio de seguimiento</span>
+          <span>Folio de seguimiento del vendedor</span>
           <StatusBadge :status="offer.status" />
         </div>
         <h2>{{ offer.sellerReference }}</h2>
@@ -62,8 +71,10 @@ function closeResend() {
         :currency="offer.currency"
         :total="offer.total"
       />
-      <footer class="ticket-footer">
+      <footer v-if="offer.status === 'active'" class="ticket-footer">
+        <ClientOfferPass :seller-reference="offer.sellerReference" />
         <button
+          v-if="offer.client.email"
           ref="resendTrigger"
           type="button"
           class="button button-secondary button-block resend-trigger"
@@ -74,11 +85,14 @@ function closeResend() {
         >
           Reenviar QR al cliente
         </button>
-        <p>Referencia interna del vendedor</p>
-        <p>No válida para canjear la oferta.</p>
-        <span>Datos de demostración</span>
+      </footer>
+      <footer v-else-if="session?.role === 'seller'" class="ticket-footer">
+        <button type="button" class="button button-primary button-block" @click="reuseOffer">
+          Reutilizar datos
+        </button>
       </footer>
       <IonModal
+        v-if="offer.status === 'active' && offer.client.email"
         :id="resendDialogId"
         :is-open="resendOpen"
         class="resend-sheet-modal"
@@ -113,69 +127,6 @@ function closeResend() {
   </AppShell>
 </template>
 <style scoped>
-.reservation-ticket {
-  position: relative;
-  padding: 24px 20px 28px;
-  border: 1px solid #e1e6ed;
-  border-top: 3px solid var(--primary);
-  background: var(--white);
-  box-shadow: 0 4px 12px #172c5005;
-  margin-bottom: 12px;
-}
-.reservation-ticket::after {
-  content: "";
-  position: absolute;
-  left: -1px;
-  right: -1px;
-  bottom: -7px;
-  height: 8px;
-  background: #e1e6ed;
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% 100%,
-    95% 0,
-    90% 100%,
-    85% 0,
-    80% 100%,
-    75% 0,
-    70% 100%,
-    65% 0,
-    60% 100%,
-    55% 0,
-    50% 100%,
-    45% 0,
-    40% 100%,
-    35% 0,
-    30% 100%,
-    25% 0,
-    20% 100%,
-    15% 0,
-    10% 100%,
-    5% 0,
-    0 100%
-  );
-}
-.ticket-header {
-  padding-bottom: 22px;
-  border-bottom: 1px dashed #d5dce5;
-}
-.ticket-brand-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-.ticket-brand-line :deep(.brand-logo) {
-  width: min(144px, 70%);
-  height: 52px;
-}
-.ticket-brand-line > span {
-  font-size: 12px;
-  letter-spacing: 1.5px;
-  color: var(--muted);
-}
 .ticket-caption-line {
   display: flex;
   align-items: center;
@@ -204,24 +155,9 @@ function closeResend() {
   border-top: 1px dashed #d5dce5;
   margin-top: 24px;
   padding-top: 20px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.7;
-}
-.ticket-footer > span {
-  display: block;
-  margin-top: 12px;
-  font-size: 10px;
-  letter-spacing: 0.5px;
 }
 .resend-trigger {
-  margin-bottom: 16px;
-}
-@media (max-width: 360px) {
-  .reservation-ticket {
-    padding-inline: 16px;
-  }
+  margin-top: 12px;
 }
 </style>
 <style>

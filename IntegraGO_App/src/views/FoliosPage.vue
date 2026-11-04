@@ -15,7 +15,6 @@ const search = ref("");
 const filter = ref<OfferFilter>("all");
 const filters = [
   { value: "all", label: "Todos" },
-  { value: "active", label: "Activos" },
   ...Object.entries(statusLabels).map(([value, label]) => ({ value, label })),
 ] as { value: OfferFilter; label: string }[];
 const filtered = computed(() =>
@@ -43,16 +42,11 @@ const filtered = computed(() =>
         <AppIcon name="close" :size="18" />
       </button>
     </div>
-    <div class="filter-list" role="group" aria-label="Filtrar por estado">
-      <button
-        v-for="item in filters"
-        :key="item.value"
-        :class="{ selected: filter === item.value }"
-        :aria-pressed="filter === item.value"
-        @click="filter = item.value"
-      >
-        {{ item.label }}
-      </button>
+    <div class="folio-segments" role="radiogroup" aria-label="Filtrar por estado">
+      <label v-for="item in filters" :key="item.value">
+        <input v-model="filter" type="radio" name="folio-status" :value="item.value" />
+        <span>{{ item.label }}</span>
+      </label>
     </div>
     <p v-if="error" class="notice notice-error" role="alert">
       {{ error }}
@@ -88,10 +82,6 @@ const filtered = computed(() =>
           Limpiar filtros
         </button>
       </div>
-      <p class="demo-note" role="status">
-        {{ filtered.length }} {{ filtered.length === 1 ? "folio" : "folios" }} ·
-        datos de demostración locales
-      </p>
     </template>
   </AppShell>
 </template>

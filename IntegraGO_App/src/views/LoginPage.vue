@@ -13,23 +13,24 @@ const router = useRouter();
 const email = ref("");
 const password = ref("");
 const visible = ref(false);
-const recovery = ref(false);
 onIonViewWillEnter(() => {
   password.value = "";
   visible.value = false;
-  recovery.value = false;
 });
 function login() {
   email.value = "";
   password.value = "";
   signIn();
-  void router.replace("/home");
+  void router.replace("/location");
 }
 </script>
 <template>
   <AppShell :tabs="false" page-class="auth-page">
     <div class="auth-content">
-      <img :src="logo" alt="IntegraGo" class="integra-logo" />
+      <div class="auth-brand">
+        <img :src="logo" alt="" class="integra-logo" />
+        <p>Integra<span>One</span></p>
+      </div>
       <h1>Iniciar sesión</h1>
       <p class="auth-description">Accede con tu cuenta corporativa</p>
       <form novalidate @submit.prevent="login">
@@ -67,17 +68,6 @@ function login() {
           Iniciar sesión
         </button>
       </form>
-      <button class="text-button auth-recovery" @click="recovery = !recovery">
-        ¿Olvidaste tu contraseña?
-      </button>
-      <p v-if="recovery" class="notice" role="status">
-        La recuperación de contraseña estará disponible cuando se integre la
-        autenticación corporativa.
-      </p>
-      <p class="auth-demo">
-        Modo demostración · pulsa Iniciar sesión sin llenar los campos. No uses
-        credenciales reales. La sesión será de Alex Demo, Budget · MID.
-      </p>
     </div>
     <BrandWaves />
   </AppShell>

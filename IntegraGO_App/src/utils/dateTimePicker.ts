@@ -15,6 +15,31 @@ export function pickerMinimum(after?: string): string {
     ),
   );
 }
+const pickupLeadTime = 30 * 60_000;
+
+export function isPickupSlot(value: string, now = Date.now()): boolean {
+  const date = new Date(value);
+  return date.getTime() >= now + pickupLeadTime &&
+    date.getMinutes() % 30 === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
+}
+
+export function pickupMinimum(): string {
+  const now = Date.now();
+  let slot = Math.ceil((now + pickupLeadTime) / 60_000) * 60_000;
+  while (new Date(slot).getMinutes() % 30 !== 0) slot += 60_000;
+  return localDateTime(new Date(slot));
+}
+
+export function pickupSlots(day: string, minimum: string): string[] {
+  const slots: string[] = [];
+  for (let hour = 0; hour < 24; hour += 1) {
+    for (const minute of ["00", "30"]) {
+      const slot = `${day}T${String(hour).padStart(2, "0")}:${minute}`;
+      if (slot >= minimum && localDateTime(new Date(slot)) === slot) slots.push(slot);
+    }
+  }
+  return slots;
+}
 export function mergePickerValue(
   current: string,
   selected: string,

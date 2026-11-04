@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { IonModal, onIonViewWillLeave } from "@ionic/vue";
+import { IonModal, IonSpinner, onIonViewWillLeave } from "@ionic/vue";
+import { Camera, CameraDirection } from "@capacitor/camera";
+import { Capacitor } from "@capacitor/core";
 import AppShell from "@/components/AppShell.vue";
 import AppIcon from "@/components/AppIcon.vue";
+import WorkLocationForm from "@/components/WorkLocationForm.vue";
 import BrandLogo from "@/components/BrandLogo.vue";
 import { session, signOut } from "@/services/session";
 import { profilePhoto, saveProfilePhoto } from "@/services/profilePhoto";
@@ -11,48 +14,70 @@ import { resetDraft } from "@/composables/useDraft";
 import { roleLabels } from "@/services/catalogs";
 import { initials } from "@/utils/format";
 
-type AccountPanel = "profile" | "branch" | "support" | "about";
+type AccountPanel = "profile" | "branch" | "support" | "about" | "logout";
 const router = useRouter();
 const panel = ref<AccountPanel | null>(null);
 const accountModal = ref<InstanceType<typeof IonModal>>();
 const photoError = ref("");
 const savingPhoto = ref(false);
 const photoInput = ref<HTMLInputElement>();
+const photoPickerOpen = ref(false);
+const photoTrigger = ref<HTMLButtonElement>();
 watch(() => session.value?.id, () => {
   photoError.value = "";
 });
 
-function changePhoto(event: Event) {
+async function choosePhoto(source: "camera" | "gallery") {
+  const userId = session.value?.id;
+  if (!userId || savingPhoto.value) return;
+  photoPickerOpen.value = false;
+  photoError.value = "";
+  if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable("Camera")) {
+    const input = photoInput.value;
+    if (source === "camera") input?.setAttribute("capture", "user");
+    else input?.removeAttribute("capture");
+    input?.click();
+    return;
+  }
+  savingPhoto.value = true;
+  try {
+    const options = { quality: 90, targetWidth: 1280, targetHeight: 1280 };
+    const photo = source === "camera"
+      ? await Camera.takePhoto({ ...options, cameraDirection: CameraDirection.Front })
+      : (await Camera.chooseFromGallery(options)).results[0];
+    if (!photo) return;
+    const path = photo.webPath ?? (photo.uri ? Capacitor.convertFileSrc(photo.uri) : "");
+    if (!path) throw new Error("Missing photo path");
+    await saveProfilePhoto(userId, path);
+  } catch (cause) {
+    const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
+    if (code === "OS-PLUG-CAMR-0003" || code === "OS-PLUG-CAMR-0005") {
+      photoError.value = "Revisa los permisos de cámara o fotos en los ajustes del teléfono.";
+    } else if (code !== "OS-PLUG-CAMR-0006") {
+      photoError.value = "No se pudo guardar la foto. Prueba con otra imagen.";
+    }
+  } finally {
+    savingPhoto.value = false;
+  }
+}
+
+async function changePhoto(event: Event) {
   const input = event.currentTarget as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
   const userId = session.value?.id;
   if (!file || !userId || savingPhoto.value) return;
   photoError.value = "";
-  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 2 * 1024 * 1024) {
-    photoError.value = "Elige una foto JPG, PNG o WebP de hasta 2 MB.";
-    return;
-  }
   savingPhoto.value = true;
-  const reader = new FileReader();
-  reader.onerror = () => {
+  const source = URL.createObjectURL(file);
+  try {
+    await saveProfilePhoto(userId, source);
+  } catch {
+    photoError.value = "No se pudo guardar la foto. Prueba con otra imagen.";
+  } finally {
+    URL.revokeObjectURL(source);
     savingPhoto.value = false;
-    photoError.value = "No se pudo leer la foto.";
-  };
-  reader.onload = async () => {
-    try {
-      if (typeof reader.result !== "string") return;
-      const photo = new Image();
-      photo.src = reader.result;
-      await photo.decode();
-      saveProfilePhoto(userId, reader.result);
-    } catch {
-      photoError.value = "No se pudo guardar la foto. Prueba con otra imagen.";
-    } finally {
-      savingPhoto.value = false;
-    }
-  };
-  reader.readAsDataURL(file);
+  }
 }
 const supportPhone = "524499118991";
 const supportTopics = [
@@ -66,7 +91,7 @@ function supportGreeting() {
   return hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
 }
 function openWhatsApp(topic?: string) {
-  const intro = supportGreeting() + ", les escribo desde IntegraGo.";
+  const intro = supportGreeting() + ", les escribo desde IntegraOne.";
   const message = topic ? intro + " Necesito ayuda con " + topic.toLocaleLowerCase("es-MX") + ".\n\nDetalles: " : intro + "\n\nMotivo: ";
   window.open("https://wa.me/" + supportPhone + "?text=" + encodeURIComponent(message), "_blank", "noopener,noreferrer");
 }
@@ -93,14 +118,7 @@ onUnmounted(() => {
   viewport?.removeEventListener("scroll", updateReportViewport);
 });
 const greeting = ref("");
-const supportDraft = ref("");
-const branchDraft = ref("");
-const isBranchRequest = computed(() => panel.value === "branch");
-const activeDraft = computed(() => isBranchRequest.value ? branchDraft : supportDraft);
-const report = computed({
-  get: () => activeDraft.value.value,
-  set: (value: string) => { activeDraft.value.value = value; },
-});
+const report = ref("");
 const sendingReport = ref(false);
 const reportError = ref("");
 const reportSent = ref(false);
@@ -108,7 +126,7 @@ function openEmailForm() {
   const hour = new Date().getHours();
   const salutation =
     hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
-  greeting.value = `${salutation}, les contacto desde IntegraGo para ${isBranchRequest.value ? "solicitar un cambio de sucursal" : "solicitar apoyo"}.`;
+  greeting.value = `${salutation}, les contacto desde IntegraOne para solicitar apoyo.`;
   reportError.value = "";
   reportSent.value = false;
   emailFormOpen.value = true;
@@ -122,8 +140,7 @@ async function sendReport() {
   )
     return;
   sendingReport.value = true;
-  const submittedDraft = activeDraft.value;
-  const branchRequest = isBranchRequest.value;
+  const submittedReport = report.value.trim();
   reportError.value = "";
   try {
     const response = await fetch(
@@ -136,8 +153,8 @@ async function sendReport() {
             (import.meta.env.DEV &&
               import.meta.env.VITE_INTEGRAGO_SUPPORT_DEMO_EMAIL) ||
             session.value.email,
-          topic: branchRequest ? "Cambio de sucursal" : "Solicitud de soporte",
-          details: `${greeting.value}\n\n${branchRequest ? "Sucursal solicitada: " : ""}${submittedDraft.value.trim()}`,
+          topic: "Solicitud de soporte",
+          details: `${greeting.value}\n\n${submittedReport}`,
         }),
       },
     );
@@ -145,8 +162,8 @@ async function sendReport() {
     const result: { success?: boolean } = await response.json();
     if (result.success !== true)
       throw new Error("SMTP acceptance was not confirmed");
-    submittedDraft.value = "";
-    if (activeDraft.value === submittedDraft) reportSent.value = true;
+    report.value = "";
+    reportSent.value = true;
   } catch {
     reportError.value =
       "No se pudo confirmar el envío. Revisa la conexión con el proxy.";
@@ -158,15 +175,16 @@ const options: { id: AccountPanel; label: string; icon: string }[] = [
   { id: "profile", label: "Mi perfil", icon: "user" },
   { id: "branch", label: "Cambio de sucursal", icon: "pin" },
   { id: "support", label: "Ayuda y soporte", icon: "support" },
-  { id: "about", label: "Acerca de IntegraGo", icon: "info" },
+  { id: "about", label: "Acerca de IntegraOne", icon: "info" },
 ];
 const panelTitle = computed(
-  () => options.find((option) => option.id === panel.value)?.label ?? "Cuenta",
+  () => panel.value === "logout"
+    ? "¿Cerrar sesión?"
+    : options.find((option) => option.id === panel.value)?.label ?? "Cuenta",
 );
 function showPanel(value: AccountPanel) {
   if (panel.value !== null) return;
   panel.value = value;
-  if (value === "branch") openEmailForm();
 }
 function closePanel() {
   const modal = accountModal.value?.$el as HTMLIonModalElement | undefined;
@@ -181,6 +199,7 @@ async function dismissPanel() {
     document.getElementById(`account-${closedPanel}`)?.focus({ preventScroll: true });
 }
 onIonViewWillLeave(() => {
+  photoPickerOpen.value = false;
   whatsappOpen.value = false;
   closePanel();
 });
@@ -211,7 +230,7 @@ function logout() {
         </div>
         <p class="profile-airport">
           <AppIcon name="pin" :size="18" aria-hidden="true" />
-          <span>{{ session.airport.name }}</span>
+          <span>{{ [session.airport.name, session.airport.counter].filter(Boolean).join(" · ") }}</span>
           <span class="airport-code">{{ session.airport.code }}</span>
         </p>
       </section>
@@ -231,7 +250,7 @@ function logout() {
             <span>{{ option.label }}</span>
             <AppIcon name="arrow" :size="16" aria-hidden="true" />
           </button>
-          <button type="button" class="account-logout" @click="logout">
+          <button id="account-logout" type="button" class="account-logout" aria-haspopup="dialog" @click="showPanel('logout')">
             <span class="account-action-icon"><AppIcon name="logout" :size="18" aria-hidden="true" /></span>
             <span>Cerrar sesión</span>
           </button>
@@ -266,7 +285,7 @@ function logout() {
           <div class="account-sheet-body">
             <template v-if="panel === 'profile'">
               <div class="sheet-profile-identity">
-                <button type="button" class="profile-photo-button" aria-label="Cambiar foto de perfil" :disabled="savingPhoto" @click="photoInput?.click()">
+                <button ref="photoTrigger" type="button" class="profile-photo-button" aria-label="Cambiar foto de perfil" aria-haspopup="dialog" :disabled="savingPhoto" @click="photoPickerOpen = true">
                   <span class="avatar" aria-hidden="true">
                     <img v-if="profilePhoto" :src="profilePhoto" alt="" />
                     <template v-else>{{ initials(session.name) }}</template>
@@ -280,10 +299,11 @@ function logout() {
                 <div>
                   <h3>{{ session.name }}</h3>
                   <p>{{ roleLabels[session.role] }}</p>
-                  <input ref="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="changePhoto" />
+                  <input ref="photoInput" type="file" accept="image/*" hidden @change="changePhoto" />
                 </div>
               </div>
               <p v-if="photoError" class="field-error" role="alert">{{ photoError }}</p>
+              <p v-else-if="savingPhoto" class="sheet-description" role="status">Guardando foto…</p>
               <dl class="sheet-profile-data">
                 <div>
                   <dt>Correo de demostración</dt>
@@ -297,32 +317,49 @@ function logout() {
                   <dt>Sucursal</dt>
                   <dd>
                     {{ session.airport.name }} ({{ session.airport.code }})
+                    <template v-if="session.airport.counter"> · {{ session.airport.counter }}</template>
                   </dd>
                 </div>
               </dl>
             </template>
-            <template v-else-if="panel === 'support' || isBranchRequest">
+            <WorkLocationForm
+              v-else-if="panel === 'branch'"
+              staged
+              submit-label="Guardar sucursal"
+              @saved="closePanel"
+            />
+            <template v-else-if="panel === 'support'">
               <template v-if="emailFormOpen">
-                <p class="support-email-address">911@grupocge.com.mx</p>
-                <p v-if="reportSent" class="notice" role="status">
-                  {{ isBranchRequest ? "Solicitud enviada a Mesa de Ayuda." : "Reporte enviado a Mesa de Ayuda." }}
-                </p>
+                <div class="support-report-status" role="status">
+                  <template v-if="sendingReport">
+                    <IonSpinner name="crescent" aria-hidden="true" />
+                    <h3>Enviando reporte…</h3>
+                    <p>Estamos enviando tu mensaje a Mesa de Ayuda.</p>
+                  </template>
+                  <template v-else-if="reportSent">
+                    <span class="support-report-check" aria-hidden="true">
+                      <AppIcon name="check" :size="28" />
+                    </span>
+                    <h3>Reporte enviado</h3>
+                    <p>Tu mensaje se envió a Mesa de Ayuda (911@grupocge.com.mx).</p>
+                  </template>
+                </div>
                 <form
-                  v-else
+                  v-if="!sendingReport && !reportSent"
                   id="support-report-form"
                   class="support-report"
                   @submit.prevent="sendReport"
                 >
+                  <p class="support-email-address">911@grupocge.com.mx</p>
                   <p>{{ greeting }}</p>
-                  <label for="support-report">{{ isBranchRequest ? "Sucursal solicitada" : "Motivo o reporte" }}</label>
+                  <label for="support-report">Motivo o reporte</label>
                   <textarea
                     id="support-report"
                     v-model="report"
                     rows="4"
                     maxlength="3800"
                     required
-                    :readonly="sendingReport"
-                    :placeholder="isBranchRequest ? 'Escribe el nombre o código de la sucursal…' : 'Cuéntanos qué pasó…'"
+                    placeholder="Cuéntanos qué pasó…"
                   />
                   <p v-if="reportError" class="field-error" role="alert">
                     {{ reportError }}
@@ -339,7 +376,7 @@ function logout() {
               </template>
             </template>
             <template v-else-if="panel === 'about'">
-              <h3>IntegraGo</h3>
+              <h3>IntegraOne</h3>
               <p class="sheet-description">
                 Captación comercial para AVIS, Budget y Payless.
               </p>
@@ -348,13 +385,24 @@ function logout() {
                 sistemas corporativos.
               </p>
             </template>
+            <p v-else-if="panel === 'logout'" class="sheet-description">
+              Para volver a IntegraOne, tendrás que iniciar sesión de nuevo.
+            </p>
           </div>
-          <footer v-if="(panel === 'support' || isBranchRequest) && emailFormOpen && !reportSent" class="account-sheet-footer">
-            <button type="submit" form="support-report-form" class="button button-primary button-block" :disabled="sendingReport || !report.trim()">
-              {{ sendingReport ? "Enviando…" : isBranchRequest ? "Enviar solicitud" : "Enviar reporte" }}
+          <footer v-if="panel === 'logout'" class="account-sheet-footer logout-confirm-actions">
+            <button type="button" class="button button-secondary" @click="closePanel">
+              Cancelar
+            </button>
+            <button type="button" class="button logout-confirm-button" @click="logout">
+              Cerrar sesión
             </button>
           </footer>
-          <footer v-else-if="panel === 'profile'" class="account-sheet-footer">
+          <footer v-else-if="panel === 'support' && emailFormOpen && !sendingReport && !reportSent" class="account-sheet-footer">
+            <button type="submit" form="support-report-form" class="button button-primary button-block" :disabled="!report.trim()">
+              Enviar reporte
+            </button>
+          </footer>
+          <footer v-else-if="panel === 'profile' || (emailFormOpen && reportSent)" class="account-sheet-footer">
             <button
               type="button"
               class="button button-primary button-block"
@@ -363,6 +411,24 @@ function logout() {
               Cerrar
             </button>
           </footer>
+        </section>
+      </IonModal>
+      <IonModal :is-open="photoPickerOpen" class="account-sheet-modal account-sheet-compact"
+        aria-labelledby="profile-photo-title" @didDismiss="photoPickerOpen = false; photoTrigger?.focus()">
+        <section class="account-sheet-content">
+          <div class="account-sheet-handle" aria-hidden="true" />
+          <header class="account-sheet-header">
+            <h2 id="profile-photo-title">Cambiar foto de perfil</h2>
+          </header>
+          <div class="account-sheet-body profile-photo-actions">
+            <button type="button" class="button button-primary button-block" @click="choosePhoto('gallery')">
+              Elegir de la galería
+            </button>
+            <button type="button" class="button button-secondary button-block" @click="choosePhoto('camera')">
+              Tomar foto
+            </button>
+            <button type="button" class="text-button" @click="photoPickerOpen = false">Cancelar</button>
+          </div>
         </section>
       </IonModal>
       <IonModal :is-open="whatsappOpen" class="account-sheet-modal account-sheet-compact" aria-labelledby="whatsapp-sheet-title" @didDismiss="whatsappOpen = false">
@@ -471,13 +537,13 @@ function logout() {
   margin-inline-start: calc(var(--profile-optical-inset) - 12px);
 }
 .profile-airport {
-  margin: 24px 0 12px;
+  margin: 36px 0 12px;
 }
 .account-actions {
-  padding-top: 8px;
+  padding-top: 16px;
 }
 .account-links {
-  --account-row-gap: 12px;
+  --account-row-gap: 24px;
   display: grid;
   gap: var(--account-row-gap);
 }
@@ -639,6 +705,10 @@ ion-modal.account-sheet-report {
   border-radius: 50%;
   background: transparent;
 }
+.profile-photo-actions {
+  display: grid;
+  gap: 12px;
+}
 .profile-photo-pencil {
   position: absolute;
   right: -3px;
@@ -696,6 +766,31 @@ ion-modal.account-sheet-report {
   display: grid;
   gap: 12px;
 }
+.support-report-status:not(:empty) {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px 0;
+  text-align: center;
+}
+.support-report-status h3,
+.support-report-status p {
+  margin: 0;
+}
+.support-report-status ion-spinner {
+  width: 32px;
+  height: 32px;
+  color: var(--ion-color-primary);
+}
+.support-report-check {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: var(--success);
+  background: var(--success-soft);
+}
 .support-report label {
   font-weight: 600;
 }
@@ -713,6 +808,15 @@ ion-modal.account-sheet-report {
 .account-sheet-footer {
   flex-shrink: 0;
   padding-top: 20px;
+}
+.logout-confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.logout-confirm-button {
+  background: var(--danger);
+  color: var(--white);
 }
 .account-sheet-profile .account-sheet-footer {
   padding-top: 4px;

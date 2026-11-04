@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import AppDateTimePicker from "@/components/AppDateTimePicker.vue";
 import AppField from "@/components/AppField.vue";
+import AppIcon from "@/components/AppIcon.vue";
 import AppSelect from "@/components/AppSelect.vue";
-import type { Currency } from "@/types";
 import { draft } from "@/composables/useDraft";
 import type { getCatalogs } from "@/services/catalogs";
 defineProps<{
@@ -10,9 +10,6 @@ defineProps<{
   catalogs: ReturnType<typeof getCatalogs>;
 }>();
 defineEmits<{ clearError: [key: string] }>();
-const currencies: { id: Currency; name: string }[] = [
-  { id: "MXN", name: "MXN" },
-];
 </script>
 <template>
   <h2>Detalles de la renta</h2>
@@ -42,6 +39,7 @@ const currencies: { id: Currency; name: string }[] = [
     id="offer-pickup"
     v-model="draft.pickupAt"
     label="Fecha y hora de entrega"
+    pickup
     :error="errors.pickupAt ?? ''"
     @change="$emit('clearError', 'pickupAt')"
   />
@@ -53,33 +51,25 @@ const currencies: { id: Currency; name: string }[] = [
     :after="draft.pickupAt"
     @change="$emit('clearError', 'returnAt')"
   />
-  <div class="form-row">
-    <AppSelect
-      id="offer-currency"
-      v-model="draft.currency"
-      label="Moneda"
-      search-placeholder="Buscar moneda…"
-      :options="currencies"
-    />
-    <AppField
+  <AppField
+    id="offer-total"
+    label="Precio total ofrecido (MXN)"
+    :error="errors.total ?? ''"
+  >
+    <AppIcon name="banknote" :size="20" />
+    <input
       id="offer-total"
-      label="Precio total ofrecido"
-      :error="errors.total ?? ''"
-    >
-      <input
-        id="offer-total"
-        v-model="draft.total"
-        type="text"
-        inputmode="decimal"
-        maxlength="12"
-        placeholder="0.00"
-        required
-        :aria-invalid="!!errors.total"
-        :aria-describedby="errors.total ? 'offer-total-error' : undefined"
-        @input="$emit('clearError', 'total')"
-      />
-    </AppField>
-  </div>
+      v-model="draft.total"
+      type="text"
+      inputmode="decimal"
+      maxlength="12"
+      placeholder="0.00"
+      required
+      :aria-invalid="!!errors.total"
+      :aria-describedby="errors.total ? 'offer-total-error' : undefined"
+      @input="$emit('clearError', 'total')"
+    />
+  </AppField>
   <p class="form-hint">
     Total final de la renta, con impuestos y cobertura incluidos.
   </p>

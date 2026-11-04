@@ -26,7 +26,7 @@ const greeting = computed(() => {
 const active = computed(
   () =>
     items.value.filter((offer) =>
-      ["generated", "presented"].includes(offer.status),
+      offer.status === "active",
     ).length,
 );
 const converted = computed(
@@ -34,7 +34,7 @@ const converted = computed(
 );
 onIonViewWillEnter(() => {
   currentHour.value = new Date().getHours();
-  document.title = "Inicio · IntegraGo";
+  document.title = "Inicio · IntegraOne";
 });
 </script>
 <template>
@@ -53,7 +53,7 @@ onIonViewWillEnter(() => {
         <p class="home-role">{{ roleLabels[session.role] }}</p>
         <p class="profile-airport home-airport">
           <AppIcon name="pin" :size="18" aria-hidden="true" />
-          <span>{{ session.airport.name }}</span>
+          <span>{{ [session.airport.name, session.airport.counter].filter(Boolean).join(" · ") }}</span>
           <span class="airport-code">{{ session.airport.code }}</span>
         </p>
       </header>
@@ -73,7 +73,7 @@ onIonViewWillEnter(() => {
           <strong>{{ loading ? "—" : converted }}</strong>
           <div class="stat-label">
             <AppIcon class="stat-converted-icon" name="capture" :size="14" aria-hidden="true" />
-            <span>Convertidos</span>
+            <span>Canjeadas</span>
           </div>
         </div>
       </section>
@@ -96,11 +96,13 @@ onIonViewWillEnter(() => {
           <p>Los folios que generes aparecerán en esta sección.</p>
         </div>
       </section>
-      <p class="demo-note">Datos de demostración · almacenamiento local.</p>
     </template>
   </AppShell>
 </template>
 <style scoped>
+.brand-row {
+  margin-bottom: 24px;
+}
 .home-profile-photo {
   width: 100%;
   height: 100%;

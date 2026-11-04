@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createOffer, loadOffers, userOffers } from "@/services/offers";
+import { clientReferenceFor, createOffer, loadOffers, lookupClientOffer, redeemClientOffer, userOffers } from "@/services/offers";
 import {
   DEMO_USER,
+  needsWorkLocation,
   restoreSession,
+  selectWorkLocation,
   session,
   signIn,
   signOut,
 } from "@/services/session";
 import { getCatalogs } from "@/services/catalogs";
-import { draft, resetDraft } from "@/composables/useDraft";
+import { draft, resetDraft, reuseOfferDraft } from "@/composables/useDraft";
 import { validateClient, validateOffer } from "@/utils/validation";
 import { filterOffers } from "@/utils/filterOffers";
 import type { OfferDraft, User } from "@/types";
@@ -32,13 +34,12 @@ function validDraft(): OfferDraft {
     client: {
       name: "Cliente Prueba",
       email: "cliente@example.com",
-      phone: "+52 555 000 0011",
+      phone: "525550000011",
     },
     groupId: "budget-intermediate",
     coverageId: "budget-plus",
     pickupAt: "2030-11-04T10:00",
     returnAt: "2030-11-06T10:00",
-    currency: "MXN",
     total: "3400.50",
   };
 }
@@ -63,8 +64,13 @@ describe("demonstration session", () => {
     signIn();
     expect(session.value?.brand).toBe("Budget");
     expect(tab.getItem("integrago.demo-session.v1")).toBe("demo");
+    expect(needsWorkLocation.value).toBe(true);
+    expect(selectWorkLocation("MID", "")).toBe(false);
+    expect(selectWorkLocation("MID", "sala-2")).toBe(true);
+    expect(needsWorkLocation.value).toBe(false);
     restoreSession();
     expect(session.value?.airport.code).toBe("MID");
+    expect(session.value?.airport.counter).toBe("Sala 2");
     signOut();
     restoreSession();
     expect(session.value).toBeNull();
@@ -83,12 +89,44 @@ describe("offer generation and persistence", () => {
     const offer = await createOffer(validDraft(), DEMO_USER);
     expect(offer).not.toHaveProperty("id");
     expect(offer).not.toHaveProperty("qr");
-    expect(offer.sellerReference).toMatch(/^SEG-DEMO-/);
+    expect(offer.sellerReference).toMatch(/^[A-Z]{3}-[A-Z0-9]{3}$/);
+    expect(offer).not.toHaveProperty("clientReference");
     for (const item of userOffers(DEMO_USER))
       expect(item).not.toHaveProperty("id");
     expect(
       filterOffers(userOffers(DEMO_USER), "BUD-DEMO-1048", "all"),
     ).toHaveLength(0);
+  });
+  it("uses a distinct client code and records the canje only once", async () => {
+    const originalDraft = validDraft();
+    originalDraft.client.email = "";
+    const offer = await createOffer(originalDraft, DEMO_USER);
+    const reference = clientReferenceFor(DEMO_USER, offer.sellerReference)!;
+    const counter: User = { ...DEMO_USER, role: "counter" };
+    expect(reference).toMatch(/^[A-Z]{3}-[A-Z0-9]{3}$/);
+    expect(reference).not.toBe(offer.sellerReference);
+    expect(lookupClientOffer(DEMO_USER, reference)).toBeUndefined();
+    expect(lookupClientOffer(counter, offer.sellerReference)).toBeUndefined();
+    expect(lookupClientOffer(counter, reference)?.name).toBe(originalDraft.client.name);
+    await redeemClientOffer(counter, reference);
+    await expect(redeemClientOffer(counter, reference)).rejects.toThrow();
+    expect(lookupClientOffer(counter, reference)?.status).toBe("converted");
+    expect(clientReferenceFor(DEMO_USER, offer.sellerReference)).toBeUndefined();
+
+    const closed = userOffers(DEMO_USER).find((item) => item.sellerReference === offer.sellerReference)!;
+    reuseOfferDraft(closed);
+    expect(draft.pickupAt).toBe(originalDraft.pickupAt);
+    expect(draft.returnAt).toBe(originalDraft.returnAt);
+    const replacement = await createOffer(draft, DEMO_USER);
+    expect(replacement.client).toEqual(closed.client);
+    expect(replacement.sellerReference).not.toBe(closed.sellerReference);
+    expect(clientReferenceFor(DEMO_USER, replacement.sellerReference)).not.toBe(reference);
+    expect(lookupClientOffer(counter, reference)?.status).toBe("converted");
+
+    vi.setSystemTime(new Date(closed.pickupAt));
+    reuseOfferDraft(closed);
+    expect(draft.pickupAt).toBe("");
+    expect(draft.returnAt).toBe(originalDraft.returnAt);
   });
   it("adds stable seller references to legacy data without losing offers", async () => {
     await loadOffers(DEMO_USER);
@@ -96,6 +134,8 @@ describe("offer generation and persistence", () => {
       local.getItem("integrago.demo-offers.v1") ?? "[]",
     ) as Record<string, unknown>[];
     const ids = existing.map((item) => item.id);
+    const oldStatuses = ["presented", "converted", "not-converted"];
+    existing.forEach((item, index) => { item.status = oldStatuses[index]; });
     existing.forEach((item) => {
       delete item.sellerReference;
     });
@@ -104,7 +144,7 @@ describe("offer generation and persistence", () => {
     const references = userOffers(DEMO_USER).map(
       (item) => item.sellerReference,
     );
-    expect(new Set(references).size).toBe(5);
+    expect(new Set(references).size).toBe(3);
     expect(references.every((reference) => !ids.includes(reference))).toBe(
       true,
     );
@@ -116,18 +156,19 @@ describe("offer generation and persistence", () => {
       local.getItem("integrago.demo-offers.v1") ?? "[]",
     ) as Record<string, unknown>[];
     expect(migrated.map((item) => item.id)).toEqual(ids);
+    expect(migrated.map((item) => item.status)).toEqual(["active", "converted", "expired"]);
   });
-  it("seeds all five states once and preserves generated offers across reloads", async () => {
+  it("seeds all three states and preserves new offers across reloads", async () => {
     await loadOffers(DEMO_USER);
     expect(new Set(userOffers(DEMO_USER).map((item) => item.status)).size).toBe(
-      5,
+      3,
     );
     const first = await createOffer(validDraft(), DEMO_USER);
     const second = await createOffer(validDraft(), DEMO_USER);
     expect(first.sellerReference).not.toBe(second.sellerReference);
-    expect(first.sellerReference).toMatch(/^SEG-DEMO-/);
+    expect(first.sellerReference).toMatch(/^[A-Z]{3}-[A-Z0-9]{3}$/);
     await loadOffers(DEMO_USER);
-    expect(userOffers(DEMO_USER)).toHaveLength(7);
+    expect(userOffers(DEMO_USER)).toHaveLength(5);
     expect(
       userOffers(DEMO_USER).find(
         (item) => item.sellerReference === first.sellerReference,
@@ -144,6 +185,13 @@ describe("offer generation and persistence", () => {
       const other: User = { ...DEMO_USER, ...change };
       expect(userOffers(other)).toHaveLength(0);
     }
+    const branch: User = { ...DEMO_USER, airport: { code: "MID-CEN", name: "Sucursal Centro" } };
+    await loadOffers(branch);
+    expect(userOffers(branch).map(({ status }) => status)).toEqual(["active", "converted", "expired"]);
+    await loadOffers(branch);
+    const references = [...userOffers(DEMO_USER), ...userOffers(branch)].map(({ sellerReference }) => sellerReference);
+    expect(references).toHaveLength(6);
+    expect(new Set(references).size).toBe(6);
   });
   it("rejects catalogs from another brand and invalid input without saving", async () => {
     await loadOffers(DEMO_USER);
@@ -153,7 +201,7 @@ describe("offer generation and persistence", () => {
     await expect(
       createOffer({ ...validDraft(), total: "-1" }, DEMO_USER),
     ).rejects.toThrow("Revisa");
-    expect(userOffers(DEMO_USER)).toHaveLength(5);
+    expect(userOffers(DEMO_USER)).toHaveLength(3);
   });
   it("reports storage write failure without claiming the offer was saved", async () => {
     await loadOffers(DEMO_USER);
@@ -163,7 +211,7 @@ describe("offer generation and persistence", () => {
     await expect(createOffer(validDraft(), DEMO_USER)).rejects.toThrow(
       "No se pudo guardar",
     );
-    expect(userOffers(DEMO_USER)).toHaveLength(5);
+    expect(userOffers(DEMO_USER)).toHaveLength(3);
   });
   it("reports corrupt storage instead of silently deleting or replacing data", async () => {
     local.setItem("integrago.demo-offers.v1", "{broken");
@@ -190,16 +238,10 @@ describe("offer generation and persistence", () => {
   it("filters by every state and searches by folio, name and formatted phone", async () => {
     await loadOffers(DEMO_USER);
     const items = userOffers(DEMO_USER);
-    expect(filterOffers(items, "", "all")).toHaveLength(5);
-    expect(filterOffers(items, "", "active")).toHaveLength(2);
-    for (const status of [
-      "generated",
-      "presented",
-      "converted",
-      "expired",
-      "not-converted",
-    ] as const)
-      expect(filterOffers(items, "", status)).toHaveLength(1);
+    expect(filterOffers(items, "", "all")).toHaveLength(3);
+    expect(filterOffers(items, "", "active")).toHaveLength(1);
+    expect(filterOffers(items, "", "converted")).toHaveLength(1);
+    expect(filterOffers(items, "", "expired")).toHaveLength(1);
     expect(
       filterOffers(
         items,
@@ -215,6 +257,9 @@ describe("offer generation and persistence", () => {
 });
 describe("wizard validation and draft lifecycle", () => {
   it("validates all three client fields", () => {
+    expect(validateClient({ name: "María Núñez", email: "", phone: "5550000011" })).toEqual({});
+    expect(validateClient({ ...validDraft().client, name: "María 2" })).toHaveProperty("name");
+    expect(validateClient({ ...validDraft().client, phone: "+52 555 000 0011" })).toHaveProperty("phone");
     expect(
       Object.keys(validateClient({ name: " ", email: "bad", phone: "123" })),
     ).toEqual(["name", "email", "phone"]);

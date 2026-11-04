@@ -4,10 +4,28 @@ import {
   localDateTime,
   mergePickerValue,
   pickerMinimum,
+  isPickupSlot,
+  pickupMinimum,
+  pickupSlots,
 } from "@/utils/dateTimePicker";
 
 afterEach(() => vi.useRealTimers());
 describe("mobile date and time selection", () => {
+  it("offers half-hour pickup slots with at least 30 minutes of lead time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2030, 10, 3, 13, 5));
+    expect(pickupMinimum()).toBe("2030-11-03T14:00");
+    expect(pickupSlots("2030-11-03", pickupMinimum()).slice(0, 2)).toEqual([
+      "2030-11-03T14:00", "2030-11-03T14:30",
+    ]);
+    expect(pickupSlots("2030-11-04", pickupMinimum())).toHaveLength(48);
+    expect(isPickupSlot("2030-11-03T13:30")).toBe(false);
+    expect(isPickupSlot("2030-11-03T14:15")).toBe(false);
+    expect(isPickupSlot("2030-11-03T14:00")).toBe(true);
+    vi.setSystemTime(new Date(2030, 10, 3, 23, 40));
+    expect(pickupMinimum()).toBe("2030-11-04T00:30");
+    expect(pickupSlots("2030-11-03", pickupMinimum())).toEqual([]);
+  });
   it("keeps noon, midnight and minutes correct when the period changes", () => {
     expect(changeTimePart("2030-11-03T12:26", "period", "am")).toBe(
       "2030-11-03T00:26",

@@ -253,7 +253,7 @@ function onDismiss() {
 }
 .select-trigger[aria-expanded="true"] {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px #075dce0c;
+  box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), 0.05);
 }
 .select-trigger .select-chevron {
   transform: rotate(90deg);

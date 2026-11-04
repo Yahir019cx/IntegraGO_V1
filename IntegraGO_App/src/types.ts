@@ -3,6 +3,7 @@ export type Role = "seller" | "counter";
 export interface Airport {
   code: string;
   name: string;
+  counter?: string;
 }
 export interface User {
   id: string;
@@ -25,8 +26,7 @@ export interface Coverage {
   id: string;
   name: string;
 }
-export type OfferStatus =
-  "generated" | "presented" | "converted" | "expired" | "not-converted";
+export type OfferStatus = "active" | "converted" | "expired";
 export type Currency = "MXN" | "USD";
 export interface OfferDraft {
   client: Client;
@@ -34,7 +34,6 @@ export interface OfferDraft {
   coverageId: string;
   pickupAt: string;
   returnAt: string;
-  currency: Currency;
   total: string;
 }
 export interface Offer {

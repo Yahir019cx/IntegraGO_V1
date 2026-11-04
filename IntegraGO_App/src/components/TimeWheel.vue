@@ -2,12 +2,22 @@
 import { computed } from "vue";
 import { IonPicker, IonPickerColumn, IonPickerColumnOption } from "@ionic/vue";
 import { changeTimePart } from "@/utils/dateTimePicker";
+const props = defineProps<{ slots: string[] | null }>();
 const model = defineModel<string>({ required: true });
+const timeFormat = new Intl.DateTimeFormat("es-MX", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
 const hour24 = computed(() => Number(model.value.slice(11, 13)));
 const hour = computed(() => hour24.value % 12 || 12);
 const minute = computed(() => Number(model.value.slice(14, 16)));
 const period = computed(() => (hour24.value >= 12 ? "pm" : "am"));
 const minutes = Array.from({ length: 60 }, (_, index) => index);
+function selectSlot(event: CustomEvent<{ value: string | number | undefined }>) {
+  const value = event.detail.value;
+  if (typeof value === "string" && props.slots?.includes(value)) model.value = value;
+}
 function update(
   part: "hour" | "minute" | "period",
   event: CustomEvent<{ value: string | number | undefined }>,
@@ -23,35 +33,47 @@ function update(
     aria-label="Seleccionar hora y minutos"
   >
     <IonPickerColumn
-      :value="hour"
-      aria-label="Hora"
-      @ionChange="update('hour', $event)"
+      v-if="slots"
+      :value="model"
+      aria-label="Horario de entrega"
+      @ionChange="selectSlot"
     >
-      <IonPickerColumnOption v-for="value in 12" :key="value" :value="value">
-        {{ String(value).padStart(2, "0") }}
+      <IonPickerColumnOption v-for="slot in slots" :key="slot" :value="slot">
+        {{ timeFormat.format(new Date(slot)) }}
       </IonPickerColumnOption>
     </IonPickerColumn>
-    <IonPickerColumn
-      :value="minute"
-      aria-label="Minutos"
-      @ionChange="update('minute', $event)"
-    >
-      <IonPickerColumnOption
-        v-for="value in minutes"
-        :key="value"
-        :value="value"
+    <template v-else>
+      <IonPickerColumn
+        :value="hour"
+        aria-label="Hora"
+        @ionChange="update('hour', $event)"
       >
-        {{ String(value).padStart(2, "0") }}
-      </IonPickerColumnOption>
-    </IonPickerColumn>
-    <IonPickerColumn
-      :value="period"
-      aria-label="Periodo del día"
-      @ionChange="update('period', $event)"
-    >
-      <IonPickerColumnOption value="pm">p.m.</IonPickerColumnOption>
-      <IonPickerColumnOption value="am">a.m.</IonPickerColumnOption>
-    </IonPickerColumn>
+        <IonPickerColumnOption v-for="value in 12" :key="value" :value="value">
+          {{ String(value).padStart(2, "0") }}
+        </IonPickerColumnOption>
+      </IonPickerColumn>
+      <IonPickerColumn
+        :value="minute"
+        aria-label="Minutos"
+        @ionChange="update('minute', $event)"
+      >
+        <IonPickerColumnOption
+          v-for="value in minutes"
+          :key="value"
+          :value="value"
+        >
+          {{ String(value).padStart(2, "0") }}
+        </IonPickerColumnOption>
+      </IonPickerColumn>
+      <IonPickerColumn
+        :value="period"
+        aria-label="Periodo del día"
+        @ionChange="update('period', $event)"
+      >
+        <IonPickerColumnOption value="pm">p.m.</IonPickerColumnOption>
+        <IonPickerColumnOption value="am">a.m.</IonPickerColumnOption>
+      </IonPickerColumn>
+    </template>
   </IonPicker>
 </template>
 <style scoped>

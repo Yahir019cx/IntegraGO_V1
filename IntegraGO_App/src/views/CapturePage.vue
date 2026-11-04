@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import AppShell from "@/components/AppShell.vue";
 import AppHeader from "@/components/AppHeader.vue";
 import AppIcon from "@/components/AppIcon.vue";
+import BrandLogo from "@/components/BrandLogo.vue";
 import ClientStep from "./capture/ClientStep.vue";
 import OfferStep from "./capture/OfferStep.vue";
 import OfferSummary from "@/components/OfferSummary.vue";
@@ -18,6 +19,12 @@ const router = useRouter();
 const step = computed(() =>
   route.query.step === "2" ? 2 : route.query.step === "3" ? 3 : 1,
 );
+const stepProgress = computed(() => {
+  const clientStep = step.value === 1;
+  const pending = clientStep ? validateClient(draft.client) : validateOffer(draft);
+  const fieldCount = clientStep ? 2 + Number(Boolean(draft.client.email.trim())) : 5;
+  return Math.round((1 - Object.keys(pending).length / fieldCount) * 100);
+});
 const catalogs = computed(() => getCatalogs(session.value?.brand ?? "Budget"));
 const errors = ref<Record<string, string>>({});
 const saving = ref(false);
@@ -117,35 +124,46 @@ async function generate() {
       @submit.prevent="step === 3 ? generate() : advance()"
     >
       <div class="form-body">
-        <ClientStep
-          v-if="step === 1"
-          :errors="errors"
-          @clear-error="delete errors[$event]"
-        />
-        <OfferStep
-          v-else-if="step === 2"
-          :errors="errors"
-          :catalogs="catalogs"
-          @clear-error="delete errors[$event]"
-        />
+        <div v-if="step < 3" class="capture-form-panel" :class="{ 'capture-offer-panel': step === 2 }">
+          <div
+            class="capture-form-progress"
+            role="progressbar"
+            aria-label="Progreso del formulario"
+            :aria-valuenow="stepProgress"
+            :style="{ '--capture-progress': stepProgress / 100 }"
+          />
+          <ClientStep
+            v-if="step === 1"
+            :errors="errors"
+            @clear-error="delete errors[$event]"
+          />
+          <OfferStep
+            v-else
+            :errors="errors"
+            :catalogs="catalogs"
+            @clear-error="delete errors[$event]"
+          />
+        </div>
         <template v-else>
           <h2>Revisa tu oferta</h2>
-          <OfferSummary
-            v-if="draft.pickupAt && draft.returnAt"
-            :client="draft.client"
-            :group="groupName"
-            :coverage="coverageName"
-            :pickup-at="draft.pickupAt"
-            :return-at="draft.returnAt"
-            :currency="draft.currency"
-            :total="Number(draft.total)"
-          />
+          <article v-if="session && draft.pickupAt && draft.returnAt"
+            class="reservation-ticket" aria-label="Resumen de la oferta">
+            <header class="ticket-header ticket-brand-line">
+              <BrandLogo :brand="session.brand" />
+              <span>{{ session.airport.code }}</span>
+            </header>
+            <OfferSummary
+              :client="draft.client"
+              :group="groupName"
+              :coverage="coverageName"
+              :pickup-at="draft.pickupAt"
+              :return-at="draft.returnAt"
+              currency="MXN"
+              :total="Number(draft.total)"
+            />
+          </article>
           <p v-else class="notice">
             Completa los pasos anteriores antes de generar tu oferta.
-          </p>
-          <p class="demo-note">
-            Oferta de prueba · {{ session?.brand }} ·
-            {{ session?.airport.code }}. Se guardará en este dispositivo.
           </p>
           <p v-if="saveError" role="alert" class="notice notice-error">
             {{ saveError }}
@@ -175,3 +193,37 @@ async function generate() {
     </form>
   </AppShell>
 </template>
+<style scoped>
+.capture-form-panel {
+  position: relative;
+  margin-inline: calc(-1 * var(--space));
+  padding: 24px var(--space) 20px;
+}
+.capture-offer-panel :deep(.select-trigger > svg),
+.capture-offer-panel :deep(.date-trigger-chevron),
+.capture-offer-panel :deep(.field-control > svg) {
+  color: var(--primary);
+}
+.capture-form-progress {
+  position: absolute;
+  inset-block: 24px;
+  inset-inline-start: calc(var(--space) / 2);
+  width: 2px;
+  background: var(--border);
+  pointer-events: none;
+}
+.capture-form-progress::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--primary);
+  transform: scaleY(var(--capture-progress));
+  transform-origin: top;
+  transition: transform 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .capture-form-progress::before {
+    transition: none;
+  }
+}
+</style>

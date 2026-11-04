@@ -3,11 +3,11 @@ import { computed, ref } from "vue";
 import { IonDatetime, IonModal } from "@ionic/vue";
 import AppIcon from "./AppIcon.vue";
 import TimeWheel from "./TimeWheel.vue";
-import { mergePickerValue, pickerMinimum } from "@/utils/dateTimePicker";
+import { isPickupSlot, mergePickerValue, pickerMinimum, pickupMinimum, pickupSlots } from "@/utils/dateTimePicker";
 
 const props = withDefaults(
-  defineProps<{ id: string; label: string; after?: string; error?: string }>(),
-  { after: "", error: "" },
+  defineProps<{ id: string; label: string; after?: string; error?: string; pickup?: boolean }>(),
+  { after: "", error: "", pickup: false },
 );
 const model = defineModel<string>({ required: true });
 const emit = defineEmits<{ change: [] }>();
@@ -27,10 +27,11 @@ function formatted(value: string, time = false) {
   ).format(new Date(value));
 }
 const display = computed(() => formatted(model.value));
+const slots = computed(() => props.pickup ? pickupSlots(pending.value.slice(0, 10), minimum.value) : []);
 function show() {
-  minimum.value = pickerMinimum(props.after);
+  minimum.value = props.pickup ? pickupMinimum() : pickerMinimum(props.after);
   pending.value =
-    Date.parse(model.value) >= Date.parse(minimum.value)
+    (props.pickup ? isPickupSlot(model.value) : Date.parse(model.value) >= Date.parse(minimum.value))
       ? model.value
       : minimum.value;
   tab.value = "date";
@@ -41,9 +42,18 @@ function update(event: CustomEvent<{ value?: string | string[] | null }>) {
   const value = event.detail.value;
   if (typeof value !== "string") return;
   pending.value = mergePickerValue(pending.value, value, tab.value);
+  if (props.pickup && !slots.value.includes(pending.value)) {
+    pending.value = slots.value[0] ?? minimum.value;
+  }
   localError.value = "";
 }
 function confirm() {
+  if (props.pickup && !isPickupSlot(pending.value)) {
+    minimum.value = pickupMinimum();
+    if (!slots.value.includes(pending.value)) pending.value = slots.value[0] ?? minimum.value;
+    localError.value = "Ese horario ya no está disponible. Confirma un horario con al menos 30 minutos de anticipación.";
+    return;
+  }
   if (
     !Number.isFinite(Date.parse(pending.value)) ||
     Date.parse(pending.value) < Date.parse(pickerMinimum(props.after))
@@ -105,7 +115,7 @@ function dismiss() {
         <header class="date-sheet-heading">
           <div>
             <h2 :id="`${id}-title`">{{ label }}</h2>
-            <p>Elige el día y ajusta la hora</p>
+            <p>{{ pickup ? "Elige un día y un horario de media hora" : "Elige el día y ajusta la hora" }}</p>
           </div>
           <button
             type="button"
@@ -167,6 +177,7 @@ function dismiss() {
           <TimeWheel
             v-else
             v-model="pending"
+            :slots="pickup ? slots : null"
             @update:model-value="localError = ''"
           />
         </div>
@@ -223,7 +234,7 @@ function dismiss() {
 }
 .date-trigger[aria-expanded="true"] {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px #075dce0c;
+  box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), 0.05);
 }
 .field-invalid .date-trigger {
   border-color: var(--danger);
@@ -372,7 +383,7 @@ ion-modal.date-modal {
 .date-picker-body ion-datetime::part(calendar-day active) {
   background: var(--primary);
   color: white;
-  box-shadow: 0 3px 8px #075dce20;
+  box-shadow: 0 3px 8px rgba(var(--ion-color-primary-rgb), 0.125);
 }
 .date-picker-body ion-datetime::part(calendar-day today) {
   border-color: #a2c5f0;

@@ -21,6 +21,7 @@ const paths: Record<string, string> = {
   car: "m5 6-2 7v6h3v-3h12v3h3v-6l-2-7Z M3 12h18 M7 6h10 M7 14h.01 M17 14h.01",
   shield: "m12 2 9 4v6c0 6-9 10-9 10S3 18 3 12V6Z m-5 10 3 3 7-7",
   calendar: "M3 5h18v16H3Z M7 3v4 M17 3v4 M3 10h18 M7 14h3 M14 14h3",
+  banknote: "M3 6h18v12H3Z M6 12h.01 M18 12h.01 M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z",
   clock: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M12 6v6l4 2",
   share: "M12 16V2 m-4 4 4-4 4 4 M5 10H3v12h18V10h-2",
   copy: "M9 9h12v12H9Z M5 15H3V3h12v2",

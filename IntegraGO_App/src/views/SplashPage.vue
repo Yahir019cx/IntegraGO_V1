@@ -12,7 +12,7 @@ onMounted(() => {
 </script>
 <template>
   <AppShell :tabs="false" page-class="splash-page">
-    <img :src="logo" alt="IntegraGo" class="integra-logo" />
+    <img :src="logo" alt="IntegraOne" class="integra-logo" />
     <BrandWaves />
   </AppShell>
 </template>

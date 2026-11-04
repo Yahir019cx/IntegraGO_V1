@@ -1,5 +1,5 @@
 import type { Offer, OfferStatus } from "@/types";
-export type OfferFilter = OfferStatus | "all" | "active";
+export type OfferFilter = OfferStatus | "all";
 
 export function filterOffers(
   items: Offer[],
@@ -10,11 +10,7 @@ export function filterOffers(
   const digits = term.replace(/\D/g, "");
   const phoneSearch = /^[+\d\s().-]+$/.test(term) && digits.length > 0;
   return items.filter((offer) => {
-    const matchesStatus =
-      filter === "all" ||
-      (filter === "active"
-        ? ["generated", "presented"].includes(offer.status)
-        : offer.status === filter);
+    const matchesStatus = filter === "all" || offer.status === filter;
     const matchesSearch =
       !term ||
       `${offer.sellerReference} ${offer.client.name}`

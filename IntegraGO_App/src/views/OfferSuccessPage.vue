@@ -4,12 +4,14 @@ import { useRoute, useRouter } from "vue-router";
 import AppShell from "@/components/AppShell.vue";
 import AppIcon from "@/components/AppIcon.vue";
 import ListSkeleton from "@/components/ListSkeleton.vue";
+import ClientOfferPass from "@/components/ClientOfferPass.vue";
 import { useOfferList } from "@/composables/useOfferList";
+import { matchesSellerReference } from "@/services/offers";
 const router = useRouter();
 const route = useRoute();
 const { items, loading, error } = useOfferList();
 const offer = computed(() =>
-  items.value.find((item) => item.sellerReference === route.params.reference),
+  items.value.find((item) => matchesSellerReference(item, route.params.reference)),
 );
 const feedback = ref("");
 async function copy() {
@@ -61,15 +63,17 @@ async function copy() {
         validar la oferta.
       </p>
       <div class="success-actions">
-        <button class="button button-primary" @click="router.replace('/home')">
+        <ClientOfferPass v-if="offer.status === 'active'" :seller-reference="offer.sellerReference" />
+        <button class="button button-secondary" @click="router.replace('/home')">
           Finalizar
         </button>
       </div>
       <p v-if="feedback" class="feedback-message" role="status">
         {{ feedback }}
       </p>
-      <p class="demo-note">
-        Guardada solo en este dispositivo. No se ha enviado ningún correo.
+      <p v-if="offer.status === 'active'" class="demo-note">
+        {{ offer.client.email ? "El cliente dejó correo. El envío por correo aún está pendiente." : "El cliente no dejó correo." }}
+        Usa «Mostrar al cliente» para que pueda fotografiar su QR o anotar su folio.
       </p>
     </section>
     <div v-else class="empty-state">
@@ -86,9 +90,18 @@ async function copy() {
   padding-top: 36px;
 }
 .seller-confirmation .folio-code {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  text-align: center;
   margin-top: 32px;
   padding: 20px 16px;
   border: 1px solid var(--border);
+}
+.seller-confirmation .folio-code > div {
+  grid-column: 2;
+}
+.seller-confirmation .success-actions {
+  flex-direction: column;
 }
 .seller-reference-note {
   max-width: 300px;

@@ -29,7 +29,7 @@ function schedule(value: string, time = false) {
       <dl class="ticket-rows">
         <div>
           <dt>Correo</dt>
-          <dd>{{ client.email }}</dd>
+          <dd>{{ client.email || "Sin correo" }}</dd>
         </div>
         <div>
           <dt>Teléfono</dt>

@@ -1,4 +1,4 @@
-# IntegraGo
+# IntegraOne
 
 Aplicación móvil interna de captación comercial para AVIS, Budget y Payless. Frontend Ionic Vue con interfaz móvil y flujos de demostración. El backend todavía no está definido: no hay APIs, autenticación corporativa, envío de correo ni conexiones a sistemas de renta.
 
@@ -86,26 +86,27 @@ El repositorio raíz queda disponible para otros proyectos; no hay repositorios 
 
 En Iniciar sesión, pulsar el botón sin llenar los campos. El acceso mock no exige ni valida credenciales. **No usar credenciales reales.** Los campos se conservan como referencia visual y se limpian al entrar; sus valores no se envían ni se persisten.
 
-La identidad ficticia fija se configura en `src/services/session.ts` mediante DEMO_USER: Alex Demo, vendedor de Budget en MID. No se selecciona marca ni aeropuerto en la interfaz. Se guarda únicamente el marcador `demo` en sessionStorage con la clave `integrago.demo-session.v1`, para restaurar la sesión al recargar la misma pestaña. Si ese almacenamiento está bloqueado, la sesión sigue en memoria. Esto no autentica ni protege datos de producción.
+La sesión de demostración asigna la región Mérida. Después de iniciar sesión se elige Centro, Hotel o Aeropuerto. En Aeropuerto se requiere elegir un counter. La selección se guarda en sessionStorage hasta cerrar sesión.
 
 Las rutas privadas redirigen al login sin sesión. Cerrar sesión elimina el marcador y limpia el borrador de captación; los folios mock permanecen en el navegador.
 
-Cambiar el rol tipado de DEMO_USER a `counter` permite revisar la configuración de navegación de mostrador: Escanear sustituye a Captar. El escáner es una pantalla explícitamente pendiente, sin acceso a cámara.
+Para probar mostrador, configura VITE_INTEGRAGO_DEMO_ROLE=counter en IntegraGO_App/.env.local y reinicia Vite. Usa el mismo dispositivo y origen para consultar las ofertas locales.
 
 ## Flujos y datos mock
 
-- `/`: presentación con el recurso original de IntegraGo. Redirige inmediatamente según la sesión; sin temporizadores artificiales.
+- `/`: presentación con el símbolo de IntegraOne. Redirige inmediatamente según la sesión; sin temporizadores artificiales.
 - `/login`: formulario, mostrar/ocultar contraseña y recuperación indicada como pendiente.
+- `/location`: selección de sucursal y counter dentro de la región asignada.
 - `/home`: marca de la sesión, saludo, empleado, dos indicadores y actividad reciente.
-- `/capture`: cliente, oferta y resumen. Nombre, correo, teléfono, fechas futuras/ordenadas y total positivo de hasta dos decimales son obligatorios. Permite volver sin perder el borrador en memoria.
-- `/offers/:reference/success`: confirmación para el vendedor con folio de seguimiento independiente, copiar esa referencia y Finalizar. No genera QR, no muestra el folio interno ni permite compartirlo.
-- `/folios`: búsqueda por folio/nombre/teléfono y filtros por los cinco estados, además de Todos y Activos. Activos agrupa Generado y Presentado.
+- `/capture`: cliente, oferta y resumen. Nombre, teléfono, fechas futuras/ordenadas y total positivo de hasta dos decimales son obligatorios. El correo es opcional. Permite volver sin perder el borrador en memoria.
+- `/offers/:reference/success`: confirmación para el vendedor con folio de seguimiento independiente, copiar esa referencia y Finalizar. Mostrar al cliente abre una vista con el QR y el folio del cliente para fotografiarlo o anotarlo.
+- `/folios`: búsqueda por folio, nombre o teléfono. Filtros Todos, Activa, Canjeada y Vencida.
 - `/folios/:reference`: detalle de una oferta del usuario, marca y aeropuerto de la sesión; contempla folio inexistente.
 - `/account`: perfil de solo lectura, soporte y edición pendientes, información y cierre de sesión.
-- `/scan`: reserva para el rol mostrador; escaneo pendiente.
+- `/scan`: mostrador puede leer un QR desde una foto o buscar por folio y registrar el canje tras verificar la identificación.
 - Direcciones desconocidas: pantalla de página no encontrada.
 
-Los catálogos de grupos y coberturas varían por marca. El precio total se captura manualmente: no hay cálculo tarifario ni descuentos. El servicio incluye cinco ofertas iniciales ficticias y genera identificadores de prueba únicos frente a los registros guardados. El folio visible del vendedor usa una referencia SEG-DEMO independiente. Inicio, Folios, búsquedas, detalle, rutas y portapapeles utilizan esa referencia. Las ofertas locales existentes reciben una referencia de seguimiento persistente sin borrar datos. Se retiraron qrcode y sus tipos al dejar de utilizarse.
+Los catálogos de grupos y coberturas varían por marca. El precio total se captura manualmente: no hay cálculo tarifario ni descuentos. El servicio incluye tres ofertas de ejemplo por sucursal nueva, una por estado y genera identificadores de prueba únicos frente a los registros guardados. El folio visible del vendedor es independiente del folio del cliente. Inicio, Folios, búsquedas, detalle, rutas y portapapeles utilizan esa referencia. Las ofertas locales existentes reciben una referencia de seguimiento persistente sin borrar datos.
 
 Los registros se guardan en localStorage, clave `integrago.demo-offers.v1`, exclusivamente para desarrollo y con datos ficticios. No es almacenamiento seguro ni de producción. Los datos corruptos o el fallo de escritura se notifican sin fingir un guardado exitoso. Para reiniciar los datos de prueba, eliminar esa clave desde las herramientas del navegador y volver a cargar. El borrador permanece únicamente en memoria y se limpia tras generar una oferta o cerrar sesión; recargar durante la captura descarta el borrador.
 
@@ -117,11 +118,11 @@ Los selectores nativos están prohibidos en la interfaz. Grupo de vehículo, cob
 
 Entrega y devolución usan AppDateTimePicker en una hoja móvil: calendario Ionic estilizado, pestañas Fecha/Hora, hora por ruedas, vista previa y confirmación explícita. Cancelar no cambia el formulario. Se conservan fecha y hora locales sin conversión a UTC durante la captura y se impiden fechas pasadas o devolución anterior a la entrega. No hay inputs date/time/datetime-local ni selects nativos. Los buscadores usan botones propios para limpiar su contenido. La revisión visual y de interacción queda a cargo del usuario; no se ejecutan builds por esta corrección.
 
-Se utilizan los archivos de marca proporcionados sin reconstruirlos ni alterar sus colores o proporciones. `IntegraLogo.png` incluye solamente el símbolo circular: falta el archivo original de la composición completa con el texto IntegraGo que aparece en el mockup. No se recreó ese texto como logotipo. Los tres archivos de marca están disponibles; tras iniciar sesión solo se muestra el correspondiente a la sesión.
+El login muestra el símbolo de IntegraLogo.png junto al nombre IntegraOne. Después de iniciar sesión aparece el logotipo de la marca asignada.
 
 ## Capacitor
 
-Capacitor usa el nombre IntegraGo, el identificador `mx.grupocge.integrago` y el directorio web `dist`. Usa ese identificador al registrar el App ID explícito de iOS para App Store Connect. Los proyectos nativos se generarán cuando se prepare cada plataforma.
+Capacitor usa el nombre IntegraOne, el identificador `mx.grupocge.integrago` y el directorio web `dist`. Usa ese identificador al registrar el App ID explícito de iOS para App Store Connect. Los proyectos nativos se generarán cuando se prepare cada plataforma.
 
 En una fase posterior, con Android Studio/SDK/JDK compatibles o macOS con Xcode para iOS:
 
@@ -148,6 +149,6 @@ Los fuentes nativos deberán versionarse entonces. Artefactos, caches, dependenc
 
 ## Separación de folios y confidencialidad
 
-El vendedor recibe únicamente su folio de seguimiento, sin folio real ni QR. La relación entre el folio de seguimiento, el identificador real y el QR deberá residir exclusivamente en la BD del backend; la API del vendedor no deberá devolver esos datos internos. El backend resolverá el match internamente con autorización por rol. El folio de seguimiento no será una credencial de canje ni un sustituto del QR.
+El folio del vendedor y el del cliente son distintos y usan el formato ABC-7K2. El QR contiene el folio del cliente para localizar la oferta. En producción, el backend debe autorizar la búsqueda y registrar el canje después de verificar la identidad.
 
 El mock local simula esa relación y expone a las vistas una proyección tipada sin identificador interno. Esto no garantiza confidencialidad real: todo dato persistido en localStorage puede inspeccionarse en el dispositivo. En producción la relación y los secretos deben permanecer en servidor. No se ha implementado BD, API ni un mecanismo de canje en esta fase.

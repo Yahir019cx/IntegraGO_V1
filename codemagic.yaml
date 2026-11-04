@@ -1,0 +1,14 @@
+workflows:
+  integrago-ionic:
+    name: IntegraGo Ionic
+    instance_type: linux_x2
+    working_directory: IntegraGO_App
+    environment:
+      node: 24
+    scripts:
+      - name: Instalar dependencias
+        script: npm ci
+      - name: Compilar la app web
+        script: npm run build
+    artifacts:
+      - IntegraGO_App/dist/**/*
